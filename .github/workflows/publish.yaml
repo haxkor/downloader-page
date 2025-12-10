@@ -7,11 +7,11 @@ on:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
