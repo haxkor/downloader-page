@@ -1,8 +1,9 @@
-FROM alpine
+FROM python:latest
 
-RUN apk upgrade && apk add pip tini python3
-RUN pip install -r requirements.txt
+# Install requirements
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY src /usr/bin/downloader-page
 
-ENTRYPOINT ["/sbin/tini", "--", "python3", "/usr/bin/downloader-page/app.py"]
+ENTRYPOINT ["python", "/usr/bin/downloader-page/app.py"]
