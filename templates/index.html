@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Video Downloader</h1>
+            <p>Download videos from YouTube and other supported platforms</p>
+        </header>
+
+        <main>
+            <div class="download-form">
+                <input type="text" id="urlInput" placeholder="Enter video URL..." />
+                <div class="format-selector">
+                    <label class="format-option">
+                        <input type="radio" name="format" value="video" checked>
+                        <span>Video</span>
+                    </label>
+                    <label class="format-option">
+                        <input type="radio" name="format" value="audio">
+                        <span>Audio Only</span>
+                    </label>
+                </div>
+                <button id="downloadBtn">Download</button>
+            </div>
+
+            <div id="status" class="status hidden">
+                <div class="status-text">
+                    <span id="statusMessage">Starting download...</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div id="progressText" class="progress-text">0%</div>
+            </div>
+
+            <div class="files-section">
+                <h2>Downloaded Files</h2>
+                <div id="filesList" class="files-list">
+                    <p class="empty-message">No files downloaded yet</p>
+                </div>
+                <button id="refreshBtn" class="refresh-btn">Refresh Files</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
