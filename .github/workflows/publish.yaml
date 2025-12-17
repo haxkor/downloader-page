@@ -33,5 +33,6 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
+          platforms: linux/arm64
           push: true
           tags: ghcr.io/${{ steps.meta.outputs.tags }}
