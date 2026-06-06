@@ -7,6 +7,7 @@ const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
 const filesList = document.getElementById('filesList');
 const refreshBtn = document.getElementById('refreshBtn');
+const clearAllBtn = document.getElementById('clearAllBtn');
 
 const chanUrlInput = document.getElementById('chanUrlInput');
 const chanDownloadBtn = document.getElementById('chanDownloadBtn');
@@ -26,6 +27,7 @@ let chanConvertWebm = false;
 // Event listeners
 downloadBtn.addEventListener('click', startDownload);
 refreshBtn.addEventListener('click', loadFiles);
+clearAllBtn.addEventListener('click', clearAll);
 urlInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') startDownload();
 });
@@ -133,6 +135,16 @@ function showError(message) {
     statusMessage.textContent = `Error: ${message}`;
     progressFill.style.width = '0%';
     progressText.textContent = '';
+}
+
+async function clearAll() {
+    try {
+        clearAllBtn.disabled = true;
+        await fetch('/hide/all', { method: 'POST' });
+        await loadFiles();
+    } finally {
+        clearAllBtn.disabled = false;
+    }
 }
 
 async function loadFiles() {

@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import time
 import subprocess
 import threading
@@ -294,19 +295,58 @@ def start_4chan_download():
     return jsonify({'download_id': download_id, 'status': 'started'})
 
 
+def _hidden_file_path():
+    return os.path.join(os.path.dirname(__file__), '.hidden.json')
+
+
+def _load_hidden():
+    try:
+        with open(_hidden_file_path()) as f:
+            return set(json.load(f))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return set()
+
+
+def _save_hidden(hidden):
+    with open(_hidden_file_path(), 'w') as f:
+        json.dump(sorted(hidden), f, indent=2)
+
+
+def _is_hidden(rel_path, hidden):
+    # Walk up the path components; hide if the entry itself or any parent dir is listed
+    path = rel_path
+    while path:
+        if path in hidden:
+            return True
+        parent = os.path.dirname(path)
+        if parent == path:
+            break
+        path = parent
+    return False
+
+
 @app.route('/files')
 def list_files():
     """List all downloaded files, including those in subdirectories."""
     files = []
     download_folder = app.config['DOWNLOAD_FOLDER']
+    hidden = _load_hidden()
+    skip = {'.gitkeep'}
 
     if os.path.exists(download_folder):
-        for dirpath, _, filenames in os.walk(download_folder):
+        for dirpath, dirnames, filenames in os.walk(download_folder):
+            # Prune hidden directories so os.walk doesn't descend into them
+            dirnames[:] = [
+                d for d in dirnames
+                if not _is_hidden(os.path.relpath(os.path.join(dirpath, d), download_folder), hidden)
+            ]
             for filename in filenames:
-                if filename == '.gitkeep':
+                if filename in skip:
                     continue
                 filepath = os.path.join(dirpath, filename)
                 rel_path = os.path.relpath(filepath, download_folder)
+                if _is_hidden(rel_path, hidden):
+                    continue
                 files.append({
                     'name': rel_path,
                     'size': os.path.getsize(filepath),
@@ -314,6 +354,22 @@ def list_files():
                 })
 
     return jsonify(files)
+
+
+@app.route('/hide/all', methods=['POST'])
+def hide_all():
+    """Hide all currently visible top-level entries."""
+    download_folder = app.config['DOWNLOAD_FOLDER']
+    hidden = _load_hidden()
+    skip = {'.gitkeep'}
+
+    if os.path.exists(download_folder):
+        for entry in os.listdir(download_folder):
+            if entry not in skip:
+                hidden.add(entry)
+
+    _save_hidden(hidden)
+    return jsonify({'status': 'ok'})
 
 
 if __name__ == '__main__':
