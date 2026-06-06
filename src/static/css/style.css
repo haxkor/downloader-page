@@ -46,7 +46,8 @@ main {
     margin-bottom: 30px;
 }
 
-#urlInput {
+#urlInput,
+#chanUrlInput {
     flex: 1 1 100%;
     padding: 15px;
     border: 2px solid #e0e0e0;
@@ -55,7 +56,8 @@ main {
     transition: border-color 0.3s;
 }
 
-#urlInput:focus {
+#urlInput:focus,
+#chanUrlInput:focus {
     outline: none;
     border-color: #667eea;
 }
@@ -285,12 +287,35 @@ main {
 }
 
 .chan-label {
-    color: #b04040;
+    color: #667eea;
+}
+
+.chan-toggle {
+    padding: 10px 16px;
+    background: white;
+    color: #666;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex: 0 0 auto;
+}
+
+.chan-toggle:hover {
+    border-color: #667eea;
+}
+
+.chan-toggle.active {
+    border-color: #667eea;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    color: #5a6fd6;
+    font-weight: 600;
 }
 
 .chan-btn {
     padding: 15px 30px;
-    background: linear-gradient(135deg, #c0392b 0%, #8e1e1e 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
     border-radius: 8px;
@@ -299,11 +324,12 @@ main {
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     flex: 0 0 auto;
+    margin-left: auto;
 }
 
 .chan-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(192, 57, 43, 0.4);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
 
 .chan-btn:active {
@@ -317,5 +343,5 @@ main {
 }
 
 .chan-progress {
-    background: linear-gradient(135deg, #c0392b 0%, #8e1e1e 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }

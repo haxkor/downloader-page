@@ -10,6 +10,7 @@ const refreshBtn = document.getElementById('refreshBtn');
 
 const chanUrlInput = document.getElementById('chanUrlInput');
 const chanDownloadBtn = document.getElementById('chanDownloadBtn');
+const chanConvertBtn = document.getElementById('chanConvertBtn');
 const chanStatusDiv = document.getElementById('chanStatus');
 const chanStatusMessage = document.getElementById('chanStatusMessage');
 const chanProgressFill = document.getElementById('chanProgressFill');
@@ -20,6 +21,7 @@ let currentDownloadId = null;
 let statusCheckInterval = null;
 let chanDownloadId = null;
 let chanStatusInterval = null;
+let chanConvertWebm = false;
 
 // Event listeners
 downloadBtn.addEventListener('click', startDownload);
@@ -30,6 +32,10 @@ urlInput.addEventListener('keypress', (e) => {
 chanDownloadBtn.addEventListener('click', startChanDownload);
 chanUrlInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') startChanDownload();
+});
+chanConvertBtn.addEventListener('click', () => {
+    chanConvertWebm = !chanConvertWebm;
+    chanConvertBtn.classList.toggle('active', chanConvertWebm);
 });
 
 // Initialize
@@ -175,7 +181,7 @@ async function startChanDownload() {
         const response = await fetch('/4chan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url }),
+            body: JSON.stringify({ url, convert_webm: chanConvertWebm }),
         });
 
         const data = await response.json();

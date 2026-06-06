@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import subprocess
 import threading
 import requests as req
 from flask import Flask, render_template, request, jsonify, send_from_directory
@@ -119,7 +120,7 @@ def get_status(download_id):
     return jsonify(download_status[download_id])
 
 
-@app.route('/downloads/<filename>')
+@app.route('/downloads/<path:filename>')
 def download_file(filename):
     """Serve downloaded file."""
     return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename, as_attachment=True)
@@ -138,6 +139,16 @@ def _make_thread_prefix(board, thread_no, op_post):
     return f'{board}_{subject}'
 
 
+def _convert_webm_to_mp4(webm_path):
+    mp4_path = os.path.splitext(webm_path)[0] + '.mp4'
+    subprocess.run(
+        ['ffmpeg', '-i', webm_path, '-c:v', 'libx264', '-c:a', 'aac', '-y', mp4_path],
+        check=True, capture_output=True
+    )
+    os.remove(webm_path)
+    return mp4_path
+
+
 def _classify_4chan_url(url):
     if re.search(r'boards\.4chan(?:nel)?\.org/[^/]+/thread/\d+', url):
         return 'thread'
@@ -153,7 +164,7 @@ _BROWSER_HEADERS = {
 }
 
 
-def download_4chan(url, download_id):
+def download_4chan(url, download_id, convert_webm=False):
     """Download 4chan thread media or single file in background thread."""
     try:
         download_status[download_id] = {
@@ -191,15 +202,17 @@ def download_4chan(url, download_id):
             media_files = []
             for post in posts:
                 if post.get('tim') and post.get('ext'):
+                    name = post.get('filename') or str(post['tim'])
                     media_files.append({
                         'url': f'https://i.4cdn.org/{board}/{post["tim"]}{post["ext"]}',
-                        'filename': f'{prefix}_{post["tim"]}{post["ext"]}',
+                        'filename': f'{prefix}_{name}{post["ext"]}',
                     })
                 for extra in post.get('extra_files', []):
                     if extra.get('tim') and extra.get('ext'):
+                        name = extra.get('filename') or str(extra['tim'])
                         media_files.append({
                             'url': f'https://i.4cdn.org/{board}/{extra["tim"]}{extra["ext"]}',
-                            'filename': f'{prefix}_{extra["tim"]}{extra["ext"]}',
+                            'filename': f'{prefix}_{name}{extra["ext"]}',
                         })
 
             download_status[download_id]['files_total'] = len(media_files)
@@ -218,6 +231,9 @@ def download_4chan(url, download_id):
                     with open(file_path, 'wb') as f:
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
+                    if convert_webm and file_path.endswith('.webm'):
+                        file_path = _convert_webm_to_mp4(file_path)
+                        media['filename'] = os.path.basename(file_path)
                     time.sleep(0.5)
                 last_filename = media['filename']
                 download_status[download_id]['files_done'] = i + 1
@@ -265,8 +281,9 @@ def start_4chan_download():
     if _classify_4chan_url(url) == 'unknown':
         return jsonify({'error': 'URL must be a 4chan thread (boards.4chan.org/.../thread/...) or a direct file (i.4cdn.org/...)'}), 400
 
+    convert_webm = bool(data.get('convert_webm', False))
     download_id = str(len(download_status) + 1)
-    thread = threading.Thread(target=download_4chan, args=(url, download_id))
+    thread = threading.Thread(target=download_4chan, args=(url, download_id, convert_webm))
     thread.daemon = True
     thread.start()
 
@@ -275,18 +292,21 @@ def start_4chan_download():
 
 @app.route('/files')
 def list_files():
-    """List all downloaded files."""
+    """List all downloaded files, including those in subdirectories."""
     files = []
     download_folder = app.config['DOWNLOAD_FOLDER']
 
     if os.path.exists(download_folder):
-        for filename in os.listdir(download_folder):
-            filepath = os.path.join(download_folder, filename)
-            if os.path.isfile(filepath) and filename != '.gitkeep':
+        for dirpath, _, filenames in os.walk(download_folder):
+            for filename in filenames:
+                if filename == '.gitkeep':
+                    continue
+                filepath = os.path.join(dirpath, filename)
+                rel_path = os.path.relpath(filepath, download_folder)
                 files.append({
-                    'name': filename,
+                    'name': rel_path,
                     'size': os.path.getsize(filepath),
-                    'url': f'/downloads/{filename}'
+                    'url': f'/downloads/{rel_path}'
                 })
 
     return jsonify(files)
