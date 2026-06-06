@@ -1,22 +1,17 @@
 import os
 import threading
 from flask import Flask, render_template, request, jsonify, send_from_directory
-from config import get_yt_dlp_options
-from args import parse_args
+import config
 import yt_dlp
 
 
-# Parse command line arguments
-args = parse_args()
-
 app = Flask(__name__)
 
-# Configure app from command line arguments
-app.config['DOWNLOAD_FOLDER'] = args.download_folder
-app.config['PORT'] = args.port
-app.config['HOST'] = args.host
-app.config['DEBUG'] = args.debug
-app.config['YT_DLP_OPTIONS'] = get_yt_dlp_options(args.download_folder)
+app.config['DOWNLOAD_FOLDER'] = config.DOWNLOAD_PATH
+app.config['PORT'] = config.PORT
+app.config['HOST'] = config.HOST
+app.config['DEBUG'] = config.DEBUG
+app.config['YT_DLP_OPTIONS'] = config.get_yt_dlp_options(config.DOWNLOAD_PATH)
 
 # Ensure download folder exists
 os.makedirs(app.config['DOWNLOAD_FOLDER'], exist_ok=True)
