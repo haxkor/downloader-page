@@ -1,5 +1,8 @@
 import os
+import re
+import time
 import threading
+import requests as req
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import config
 import yt_dlp
@@ -120,6 +123,154 @@ def get_status(download_id):
 def download_file(filename):
     """Serve downloaded file."""
     return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename, as_attachment=True)
+
+
+def _make_thread_prefix(board, thread_no, op_post):
+    subject = op_post.get('sub', '') or ''
+    # Strip HTML tags (subject can contain <wbr> etc.)
+    subject = re.sub(r'<[^>]+>', '', subject).strip()
+    if not subject:
+        subject = thread_no
+    # Sanitize: keep alphanumeric, spaces, hyphens; collapse and replace spaces
+    subject = re.sub(r'[^\w\s-]', '', subject)
+    subject = re.sub(r'\s+', '_', subject.strip())
+    subject = subject[:60].rstrip('_')
+    return f'{board}_{subject}'
+
+
+def _classify_4chan_url(url):
+    if re.search(r'boards\.4chan(?:nel)?\.org/[^/]+/thread/\d+', url):
+        return 'thread'
+    if re.search(r'i\.4cdn\.org/', url):
+        return 'file'
+    return 'unknown'
+
+
+_BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+}
+
+
+def download_4chan(url, download_id):
+    """Download 4chan thread media or single file in background thread."""
+    try:
+        download_status[download_id] = {
+            'status': 'downloading',
+            'progress': 0,
+            'filename': None,
+            'error': None,
+            'files_done': 0,
+            'files_total': 0,
+        }
+
+        download_folder = app.config['DOWNLOAD_FOLDER']
+        url_type = _classify_4chan_url(url)
+        session = req.Session()
+        session.headers.update(_BROWSER_HEADERS)
+
+        if url_type == 'thread':
+            m = re.search(r'boards\.4chan(?:nel)?\.org/([^/]+)/thread/(\d+)', url)
+            board = m.group(1)
+            thread_no = m.group(2)
+
+            # Visit the thread page first so the session picks up any cookies
+            session.get(f'https://boards.4chan.org/{board}/thread/{thread_no}', timeout=15)
+
+            api_url = f'https://a.4cdn.org/{board}/thread/{thread_no}.json'
+            r = session.get(api_url, timeout=30)
+            r.raise_for_status()
+            thread_data = r.json()
+
+            posts = thread_data.get('posts', [])
+            prefix = _make_thread_prefix(board, thread_no, posts[0] if posts else {})
+            thread_dir = os.path.join(download_folder, prefix)
+            os.makedirs(thread_dir, exist_ok=True)
+
+            media_files = []
+            for post in posts:
+                if post.get('tim') and post.get('ext'):
+                    media_files.append({
+                        'url': f'https://i.4cdn.org/{board}/{post["tim"]}{post["ext"]}',
+                        'filename': f'{prefix}_{post["tim"]}{post["ext"]}',
+                    })
+                for extra in post.get('extra_files', []):
+                    if extra.get('tim') and extra.get('ext'):
+                        media_files.append({
+                            'url': f'https://i.4cdn.org/{board}/{extra["tim"]}{extra["ext"]}',
+                            'filename': f'{prefix}_{extra["tim"]}{extra["ext"]}',
+                        })
+
+            download_status[download_id]['files_total'] = len(media_files)
+
+            last_filename = None
+            for i, media in enumerate(media_files):
+                file_path = os.path.join(thread_dir, media['filename'])
+                if not os.path.exists(file_path):
+                    r = session.get(media['url'], timeout=60, stream=True,
+                                    headers={'Referer': f'https://boards.4chan.org/{board}/thread/{thread_no}',
+                                             'Accept': '*/*',
+                                             'Sec-Fetch-Dest': 'video',
+                                             'Sec-Fetch-Mode': 'no-cors',
+                                             'Sec-Fetch-Site': 'cross-site'})
+                    r.raise_for_status()
+                    with open(file_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    time.sleep(0.5)
+                last_filename = media['filename']
+                download_status[download_id]['files_done'] = i + 1
+                download_status[download_id]['progress'] = int(((i + 1) / len(media_files)) * 100)
+
+            download_status[download_id]['status'] = 'completed'
+            download_status[download_id]['progress'] = 100
+            download_status[download_id]['filename'] = last_filename
+
+        else:
+            filename = url.split('/')[-1].split('?')[0]
+            file_path = os.path.join(download_folder, filename)
+
+            r = session.get(url, timeout=60, stream=True,
+                            headers={'Accept': '*/*', 'Referer': 'https://boards.4chan.org/'})
+            r.raise_for_status()
+
+            total = int(r.headers.get('content-length', 0))
+            downloaded = 0
+            with open(file_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total > 0:
+                        download_status[download_id]['progress'] = int((downloaded / total) * 100)
+
+            download_status[download_id]['status'] = 'completed'
+            download_status[download_id]['progress'] = 100
+            download_status[download_id]['filename'] = filename
+
+    except Exception as e:
+        download_status[download_id]['status'] = 'error'
+        download_status[download_id]['error'] = str(e)
+
+
+@app.route('/4chan', methods=['POST'])
+def start_4chan_download():
+    """Start a 4chan thread or file download."""
+    data = request.get_json()
+    url = data.get('url', '').strip()
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    if _classify_4chan_url(url) == 'unknown':
+        return jsonify({'error': 'URL must be a 4chan thread (boards.4chan.org/.../thread/...) or a direct file (i.4cdn.org/...)'}), 400
+
+    download_id = str(len(download_status) + 1)
+    thread = threading.Thread(target=download_4chan, args=(url, download_id))
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({'download_id': download_id, 'status': 'started'})
 
 
 @app.route('/files')

@@ -253,3 +253,69 @@ main {
 .refresh-btn:hover {
     background: #e0e0e0;
 }
+
+.section-divider {
+    display: flex;
+    align-items: center;
+    margin: 28px 0;
+    color: #bbb;
+}
+
+.section-divider::before,
+.section-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.section-divider span {
+    padding: 0 14px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #999;
+    margin-bottom: 10px;
+}
+
+.chan-label {
+    color: #b04040;
+}
+
+.chan-btn {
+    padding: 15px 30px;
+    background: linear-gradient(135deg, #c0392b 0%, #8e1e1e 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    flex: 0 0 auto;
+}
+
+.chan-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(192, 57, 43, 0.4);
+}
+
+.chan-btn:active {
+    transform: translateY(0);
+}
+
+.chan-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.chan-progress {
+    background: linear-gradient(135deg, #c0392b 0%, #8e1e1e 100%);
+}

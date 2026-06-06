@@ -14,6 +14,7 @@
         </header>
 
         <main>
+            <div class="section-label">Video / Audio</div>
             <div class="download-form">
                 <input type="text" id="urlInput" placeholder="Enter video URL..." />
                 <div class="format-selector">
@@ -37,6 +38,24 @@
                     <div id="progressFill" class="progress-fill"></div>
                 </div>
                 <div id="progressText" class="progress-text">0%</div>
+            </div>
+
+            <div class="section-divider"><span>or</span></div>
+
+            <div class="section-label chan-label">4chan</div>
+            <div class="download-form">
+                <input type="text" id="chanUrlInput" placeholder="Enter 4chan thread or file URL..." />
+                <button id="chanDownloadBtn" class="chan-btn">Download</button>
+            </div>
+
+            <div id="chanStatus" class="status hidden">
+                <div class="status-text">
+                    <span id="chanStatusMessage">Starting download...</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="chanProgressFill" class="progress-fill chan-progress"></div>
+                </div>
+                <div id="chanProgressText" class="progress-text">0%</div>
             </div>
 
             <div class="files-section">

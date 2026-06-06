@@ -8,17 +8,28 @@ const progressText = document.getElementById('progressText');
 const filesList = document.getElementById('filesList');
 const refreshBtn = document.getElementById('refreshBtn');
 
+const chanUrlInput = document.getElementById('chanUrlInput');
+const chanDownloadBtn = document.getElementById('chanDownloadBtn');
+const chanStatusDiv = document.getElementById('chanStatus');
+const chanStatusMessage = document.getElementById('chanStatusMessage');
+const chanProgressFill = document.getElementById('chanProgressFill');
+const chanProgressText = document.getElementById('chanProgressText');
+
 // State
 let currentDownloadId = null;
 let statusCheckInterval = null;
+let chanDownloadId = null;
+let chanStatusInterval = null;
 
 // Event listeners
 downloadBtn.addEventListener('click', startDownload);
 refreshBtn.addEventListener('click', loadFiles);
 urlInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        startDownload();
-    }
+    if (e.key === 'Enter') startDownload();
+});
+chanDownloadBtn.addEventListener('click', startChanDownload);
+chanUrlInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') startChanDownload();
 });
 
 // Initialize
@@ -148,6 +159,99 @@ function formatBytes(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+async function startChanDownload() {
+    const url = chanUrlInput.value.trim();
+    if (!url) {
+        alert('Please enter a 4chan URL');
+        return;
+    }
+
+    try {
+        chanDownloadBtn.disabled = true;
+        showChanStatus('Starting download...', 0);
+
+        const response = await fetch('/4chan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Download failed');
+
+        chanDownloadId = data.download_id;
+        checkChanStatus();
+
+    } catch (error) {
+        showChanError(error.message);
+        chanDownloadBtn.disabled = false;
+    }
+}
+
+function checkChanStatus() {
+    if (!chanDownloadId) return;
+
+    chanStatusInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`/status/${chanDownloadId}`);
+            const data = await response.json();
+
+            if (data.status === 'downloading') {
+                const msg = data.files_total > 0
+                    ? `Downloading ${data.files_done} / ${data.files_total} files...`
+                    : 'Downloading...';
+                showChanStatus(msg, data.progress);
+            } else if (data.status === 'completed') {
+                const msg = data.files_total > 1
+                    ? `Downloaded ${data.files_total} files`
+                    : `Download completed! (${data.filename})`;
+                showChanSuccess(msg);
+                stopChanStatusCheck();
+                loadFiles();
+                chanUrlInput.value = '';
+                chanDownloadBtn.disabled = false;
+            } else if (data.status === 'error') {
+                showChanError(data.error || 'Download failed');
+                stopChanStatusCheck();
+                chanDownloadBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Chan status check error:', error);
+        }
+    }, 1000);
+}
+
+function stopChanStatusCheck() {
+    if (chanStatusInterval) {
+        clearInterval(chanStatusInterval);
+        chanStatusInterval = null;
+    }
+    chanDownloadId = null;
+}
+
+function showChanStatus(message, progress) {
+    chanStatusDiv.classList.remove('hidden', 'error', 'success');
+    chanStatusMessage.textContent = message;
+    chanProgressFill.style.width = `${progress}%`;
+    chanProgressText.textContent = `${progress}%`;
+}
+
+function showChanSuccess(message) {
+    chanStatusDiv.classList.remove('hidden', 'error');
+    chanStatusDiv.classList.add('success');
+    chanStatusMessage.textContent = message;
+    chanProgressFill.style.width = '100%';
+    chanProgressText.textContent = '100%';
+}
+
+function showChanError(message) {
+    chanStatusDiv.classList.remove('hidden', 'success');
+    chanStatusDiv.classList.add('error');
+    chanStatusMessage.textContent = `Error: ${message}`;
+    chanProgressFill.style.width = '0%';
+    chanProgressText.textContent = '';
 }
 
 function escapeHtml(text) {
