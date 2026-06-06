@@ -4,7 +4,7 @@ import time
 import subprocess
 import threading
 import requests as req
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_file, abort
 import config
 import yt_dlp
 
@@ -123,7 +123,11 @@ def get_status(download_id):
 @app.route('/downloads/<path:filename>')
 def download_file(filename):
     """Serve downloaded file."""
-    return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename, as_attachment=True)
+    download_folder = os.path.abspath(app.config['DOWNLOAD_FOLDER'])
+    filepath = os.path.normpath(os.path.join(download_folder, filename))
+    if not filepath.startswith(download_folder + os.sep):
+        abort(404)
+    return send_file(filepath, as_attachment=True)
 
 
 def _make_thread_prefix(board, thread_no, op_post):
