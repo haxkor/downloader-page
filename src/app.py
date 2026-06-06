@@ -2,6 +2,7 @@ import os
 import re
 import json
 import time
+import logging
 import subprocess
 import threading
 import requests as req
@@ -9,6 +10,12 @@ from flask import Flask, render_template, request, jsonify, send_file, abort
 import config
 import yt_dlp
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s',
+    datefmt='%H:%M:%S',
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -27,6 +34,7 @@ download_status = {}
 
 def download_video(url, download_id, format_type='video'):
     """Download video in background thread."""
+    logger.info("yt-dlp start: %s [%s]", url, format_type)
     try:
         download_status[download_id] = {
             'status': 'downloading',
@@ -73,8 +81,10 @@ def download_video(url, download_id, format_type='video'):
             download_status[download_id]['filename'] = os.path.basename(filename)
             download_status[download_id]['status'] = 'completed'
             download_status[download_id]['progress'] = 100
+            logger.info("yt-dlp done: %s", os.path.basename(filename))
 
     except Exception as e:
+        logger.error("yt-dlp error: %s", e)
         download_status[download_id]['status'] = 'error'
         download_status[download_id]['error'] = str(e)
 
@@ -190,6 +200,7 @@ def download_4chan(url, download_id, convert_webm=False):
             m = re.search(r'boards\.4chan(?:nel)?\.org/([^/]+)/thread/(\d+)', url)
             board = m.group(1)
             thread_no = m.group(2)
+            logger.info("4chan thread /%s/%s | webm→mp4=%s", board, thread_no, convert_webm)
 
             # Visit the thread page first so the session picks up any cookies
             session.get(f'https://boards.4chan.org/{board}/thread/{thread_no}', timeout=15)
@@ -221,6 +232,7 @@ def download_4chan(url, download_id, convert_webm=False):
                         })
 
             download_status[download_id]['files_total'] = len(media_files)
+            logger.info("4chan thread /%s/%s | %d files found", board, thread_no, len(media_files))
 
             last_filename = None
             for i, media in enumerate(media_files):
@@ -247,9 +259,11 @@ def download_4chan(url, download_id, convert_webm=False):
             download_status[download_id]['status'] = 'completed'
             download_status[download_id]['progress'] = 100
             download_status[download_id]['filename'] = last_filename
+            logger.info("4chan done: %d files → %s/", len(media_files), prefix)
 
         else:
             filename = url.split('/')[-1].split('?')[0]
+            logger.info("4chan file: %s", filename)
             file_path = os.path.join(download_folder, filename)
 
             r = session.get(url, timeout=60, stream=True,
@@ -268,8 +282,10 @@ def download_4chan(url, download_id, convert_webm=False):
             download_status[download_id]['status'] = 'completed'
             download_status[download_id]['progress'] = 100
             download_status[download_id]['filename'] = filename
+            logger.info("4chan done: %s", filename)
 
     except Exception as e:
+        logger.error("4chan error: %s", e)
         download_status[download_id]['status'] = 'error'
         download_status[download_id]['error'] = str(e)
 
